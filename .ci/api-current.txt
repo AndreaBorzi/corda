@@ -2921,7 +2921,7 @@ public static final class net.corda.core.serialization.SingletonSerializationTok
   @org.jetbrains.annotations.NotNull public final net.corda.core.crypto.SecureHash getId()
   @org.jetbrains.annotations.NotNull public final String getReason()
 ##
-@net.corda.core.DoNotImplement public abstract class net.corda.core.transactions.CoreTransaction extends net.corda.core.transactions.BaseTransaction
+@net.corda.core.serialization.CordaSerializable @net.corda.core.DoNotImplement public abstract class net.corda.core.transactions.CoreTransaction extends net.corda.core.transactions.BaseTransaction
   public <init>()
   @org.jetbrains.annotations.NotNull public abstract List getInputs()
 ##
@@ -3163,7 +3163,7 @@ public class net.corda.core.transactions.TransactionBuilder extends java.lang.Ob
   public abstract void verifyRequiredSignatures()
   public abstract void verifySignaturesExcept(Collection)
 ##
-@net.corda.core.DoNotImplement public abstract class net.corda.core.transactions.TraversableTransaction extends net.corda.core.transactions.CoreTransaction
+@net.corda.core.serialization.CordaSerializable @net.corda.core.DoNotImplement public abstract class net.corda.core.transactions.TraversableTransaction extends net.corda.core.transactions.CoreTransaction
   public <init>(List)
   @org.jetbrains.annotations.NotNull public final List getAttachments()
   @org.jetbrains.annotations.NotNull public final List getAvailableComponentGroups()
