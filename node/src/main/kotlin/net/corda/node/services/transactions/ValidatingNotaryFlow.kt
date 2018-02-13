@@ -4,8 +4,11 @@ import co.paralleluniverse.fibers.Suspendable
 import net.corda.core.contracts.TimeWindow
 import net.corda.core.contracts.TransactionVerificationException
 import net.corda.core.flows.*
+import net.corda.core.internal.NotarisationRequest
+import net.corda.core.internal.NotarisationRequestSignature
 import net.corda.core.node.services.TrustedAuthorityNotaryService
 import net.corda.core.transactions.TransactionWithSignatures
+import net.corda.core.utilities.unwrap
 import java.security.SignatureException
 
 /**
@@ -22,7 +25,9 @@ class ValidatingNotaryFlow(otherSideSession: FlowSession, service: TrustedAuthor
     @Suspendable
     override fun receiveAndVerifyTx(): TransactionParts {
         try {
+            val requestSignature = otherSideSession.receive<NotarisationRequestSignature>().unwrap { it }
             val stx = subFlow(ReceiveTransactionFlow(otherSideSession, checkSufficientSignatures = false))
+            validateRequest(NotarisationRequest(stx.inputs, stx.id), requestSignature)
             val notary = stx.notary
             checkNotary(notary)
             val timeWindow: TimeWindow? = if (stx.isNotaryChangeTransaction())

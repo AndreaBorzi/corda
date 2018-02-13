@@ -3,12 +3,11 @@ package net.corda.core.flows
 import co.paralleluniverse.fibers.Suspendable
 import net.corda.core.contracts.StateRef
 import net.corda.core.contracts.TimeWindow
-import net.corda.core.crypto.SecureHash
-import net.corda.core.crypto.SignedData
-import net.corda.core.crypto.TransactionSignature
-import net.corda.core.crypto.keys
+import net.corda.core.crypto.*
 import net.corda.core.identity.Party
 import net.corda.core.internal.FetchDataFlow
+import net.corda.core.internal.NotarisationRequestSignature
+import net.corda.core.internal.NotarisationRequest
 import net.corda.core.node.services.NotaryService
 import net.corda.core.node.services.TrustedAuthorityNotaryService
 import net.corda.core.node.services.UniquenessProvider
@@ -78,6 +77,8 @@ class NotaryFlow {
         protected fun notarise(notaryParty: Party): UntrustworthyData<List<TransactionSignature>> {
             return try {
                 val session = initiateFlow(notaryParty)
+                val notarisationRequestSignature = NotarisationRequest(stx.inputs, stx.id).generateSignature(serviceHub)
+                session.send(notarisationRequestSignature)
                 if (serviceHub.networkMapCache.isValidatingNotary(notaryParty)) {
                     sendAndReceiveValidating(session)
                 } else {
@@ -161,6 +162,12 @@ class NotaryFlow {
          */
         @Suspendable
         abstract fun receiveAndVerifyTx(): TransactionParts
+
+        protected fun validateRequest(request: NotarisationRequest, signature: NotarisationRequestSignature) {
+            val requestingParty = otherSideSession.counterparty
+            request.verifySignature(signature, requestingParty)
+            // TODO: persist the signature for traceability
+        }
 
         // Check if transaction is intended to be signed by this notary.
         @Suspendable
