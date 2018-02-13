@@ -25,6 +25,7 @@ import net.corda.core.serialization.CordaSerializable
 import net.corda.core.serialization.SingletonSerializeAsToken
 import net.corda.core.serialization.deserialize
 import net.corda.core.serialization.serialize
+import net.corda.core.transactions.CoreTransaction
 import net.corda.core.transactions.FilteredTransaction
 import net.corda.core.transactions.SignedTransaction
 import net.corda.core.utilities.contextLogger
@@ -102,12 +103,12 @@ object BFTSMaRt {
          * replica, and block until a sufficient number of replies are received.
          */
         fun commitTransaction(transaction: Any, otherSide: Party): ClusterResponse {
-            require(transaction is FilteredTransaction || transaction is SignedTransaction) { "Unsupported transaction type: ${transaction.javaClass.name}" }
+            require(transaction is CoreTransaction || transaction is SignedTransaction) { "Unsupported transaction type: ${transaction.javaClass.name}" }
             awaitClientConnectionToCluster()
             cluster.waitUntilAllReplicasHaveInitialized()
             val requestBytes = CommitRequest(transaction, otherSide).serialize().bytes
             val responseBytes = proxy.invokeOrdered(requestBytes)
-            return responseBytes.deserialize<ClusterResponse>()
+            return responseBytes.deserialize()
         }
 
         /** A comparator to check if replies from two replicas are the same. */

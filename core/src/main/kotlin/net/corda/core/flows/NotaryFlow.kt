@@ -166,7 +166,7 @@ class NotaryFlow {
         protected fun validateRequest(request: NotarisationRequest, signature: NotarisationRequestSignature) {
             val requestingParty = otherSideSession.counterparty
             request.verifySignature(signature, requestingParty)
-            // TODO: persist the signature for traceability
+            // TODO: persist the signature for traceability.
         }
 
         // Check if transaction is intended to be signed by this notary.

@@ -12,11 +12,14 @@ import net.corda.core.flows.NotaryError
 import net.corda.core.flows.NotaryException
 import net.corda.core.identity.CordaX500Name
 import net.corda.core.identity.Party
+import net.corda.core.internal.NotarisationRequest
+import net.corda.core.internal.NotarisationRequestSignature
 import net.corda.core.node.services.NotaryService
 import net.corda.core.node.services.UniquenessProvider
 import net.corda.core.schemas.PersistentStateRef
 import net.corda.core.serialization.deserialize
 import net.corda.core.serialization.serialize
+import net.corda.core.transactions.CoreTransaction
 import net.corda.core.transactions.FilteredTransaction
 import net.corda.core.utilities.*
 import net.corda.node.services.api.ServiceHubInternal
@@ -74,18 +77,25 @@ class BFTNonValidatingNotaryService(
     private class ServiceFlow(val otherSideSession: FlowSession, val service: BFTNonValidatingNotaryService) : FlowLogic<Void?>() {
         @Suspendable
         override fun call(): Void? {
-            val stx = otherSideSession.receive<FilteredTransaction>().unwrap { it }
-            val signatures = commit(stx)
+            val requestSignature = otherSideSession.receive<NotarisationRequestSignature>().unwrap { it }
+            val tx = otherSideSession.receive<CoreTransaction>().unwrap { transaction ->
+                val request = NotarisationRequest(transaction.inputs, transaction.id)
+                val requestingParty = otherSideSession.counterparty
+                request.verifySignature(requestSignature, requestingParty)
+                transaction
+                // TODO: persist the signature for traceability.
+            }
+            val signatures = commit(tx)
             otherSideSession.send(signatures)
             return null
         }
 
-        private fun commit(stx: FilteredTransaction): List<DigitalSignature> {
-            val response = service.commitTransaction(stx, otherSideSession.counterparty)
+        private fun commit(tx: CoreTransaction): List<DigitalSignature> {
+            val response = service.commitTransaction(tx, otherSideSession.counterparty)
             when (response) {
                 is BFTSMaRt.ClusterResponse.Error -> throw NotaryException(response.error)
                 is BFTSMaRt.ClusterResponse.Signatures -> {
-                    log.debug("All input states of transaction ${stx.id} have been committed")
+                    log.debug("All input states of transaction ${tx.id} have been committed")
                     return response.txSignatures
                 }
             }
