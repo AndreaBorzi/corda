@@ -12,8 +12,8 @@ import net.corda.core.flows.NotaryError
 import net.corda.core.flows.NotaryException
 import net.corda.core.identity.CordaX500Name
 import net.corda.core.identity.Party
+import net.corda.core.internal.NotarisationPayload
 import net.corda.core.internal.NotarisationRequest
-import net.corda.core.internal.NotarisationRequestSignature
 import net.corda.core.node.services.NotaryService
 import net.corda.core.node.services.UniquenessProvider
 import net.corda.core.schemas.PersistentStateRef
@@ -21,7 +21,10 @@ import net.corda.core.serialization.deserialize
 import net.corda.core.serialization.serialize
 import net.corda.core.transactions.CoreTransaction
 import net.corda.core.transactions.FilteredTransaction
-import net.corda.core.utilities.*
+import net.corda.core.utilities.contextLogger
+import net.corda.core.utilities.debug
+import net.corda.core.utilities.getOrThrow
+import net.corda.core.utilities.unwrap
 import net.corda.node.services.api.ServiceHubInternal
 import net.corda.node.services.config.BFTSMaRtConfiguration
 import net.corda.node.utilities.AppendOnlyPersistentMap
@@ -77,13 +80,12 @@ class BFTNonValidatingNotaryService(
     private class ServiceFlow(val otherSideSession: FlowSession, val service: BFTNonValidatingNotaryService) : FlowLogic<Void?>() {
         @Suspendable
         override fun call(): Void? {
-            val requestSignature = otherSideSession.receive<NotarisationRequestSignature>().unwrap { it }
-            val tx = otherSideSession.receive<CoreTransaction>().unwrap { transaction ->
+            val tx = otherSideSession.receive<NotarisationPayload>().unwrap { (transaction, requestSignature) ->
                 val request = NotarisationRequest(transaction.inputs, transaction.id)
                 val requestingParty = otherSideSession.counterparty
                 request.verifySignature(requestSignature, requestingParty)
-                transaction
                 // TODO: persist the signature for traceability.
+                transaction
             }
             val signatures = commit(tx)
             otherSideSession.send(signatures)

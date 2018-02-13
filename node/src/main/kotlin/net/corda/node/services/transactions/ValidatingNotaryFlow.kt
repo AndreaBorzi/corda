@@ -25,9 +25,7 @@ class ValidatingNotaryFlow(otherSideSession: FlowSession, service: TrustedAuthor
     @Suspendable
     override fun receiveAndVerifyTx(): TransactionParts {
         try {
-            val requestSignature = otherSideSession.receive<NotarisationRequestSignature>().unwrap { it }
             val stx = subFlow(ReceiveTransactionFlow(otherSideSession, checkSufficientSignatures = false))
-            validateRequest(NotarisationRequest(stx.inputs, stx.id), requestSignature)
             val notary = stx.notary
             checkNotary(notary)
             val timeWindow: TimeWindow? = if (stx.isNotaryChangeTransaction())

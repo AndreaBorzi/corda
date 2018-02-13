@@ -5,8 +5,8 @@ import net.corda.core.contracts.ComponentGroupEnum
 import net.corda.core.flows.FlowSession
 import net.corda.core.flows.NotaryFlow
 import net.corda.core.flows.TransactionParts
+import net.corda.core.internal.NotarisationPayload
 import net.corda.core.internal.NotarisationRequest
-import net.corda.core.internal.NotarisationRequestSignature
 import net.corda.core.node.services.TrustedAuthorityNotaryService
 import net.corda.core.transactions.CoreTransaction
 import net.corda.core.transactions.FilteredTransaction
@@ -24,8 +24,7 @@ class NonValidatingNotaryFlow(otherSideSession: FlowSession, service: TrustedAut
      */
     @Suspendable
     override fun receiveAndVerifyTx(): TransactionParts {
-        val requestSignature = otherSideSession.receive<NotarisationRequestSignature>().unwrap { it }
-        return otherSideSession.receive<CoreTransaction>().unwrap { transaction ->
+        return otherSideSession.receive<NotarisationPayload>().unwrap { (transaction, requestSignature) ->
             val request = NotarisationRequest(transaction.inputs, transaction.id)
             validateRequest(request, requestSignature)
             extractParts(transaction)

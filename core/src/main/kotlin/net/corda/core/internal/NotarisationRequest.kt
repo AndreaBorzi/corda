@@ -7,6 +7,7 @@ import net.corda.core.identity.Party
 import net.corda.core.node.ServiceHub
 import net.corda.core.serialization.CordaSerializable
 import net.corda.core.serialization.serialize
+import net.corda.core.transactions.CoreTransaction
 
 /**
  * A notarisation request specifies a list of states to consume and the id of the consuming transaction. Its primary
@@ -51,3 +52,6 @@ data class NotarisationRequest(val inputStates: List<StateRef>, val transactionI
 /** A wrapper around a digital signature used for notarisation requests. */
 @CordaSerializable
 data class NotarisationRequestSignature(val digitalSignature: DigitalSignature.WithKey)
+
+@CordaSerializable
+data class NotarisationPayload(val transaction: CoreTransaction, val requestSignature: NotarisationRequestSignature)

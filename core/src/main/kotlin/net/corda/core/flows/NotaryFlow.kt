@@ -3,15 +3,20 @@ package net.corda.core.flows
 import co.paralleluniverse.fibers.Suspendable
 import net.corda.core.contracts.StateRef
 import net.corda.core.contracts.TimeWindow
-import net.corda.core.crypto.*
+import net.corda.core.crypto.SecureHash
+import net.corda.core.crypto.SignedData
+import net.corda.core.crypto.TransactionSignature
+import net.corda.core.crypto.keys
 import net.corda.core.identity.Party
 import net.corda.core.internal.FetchDataFlow
-import net.corda.core.internal.NotarisationRequestSignature
+import net.corda.core.internal.NotarisationPayload
 import net.corda.core.internal.NotarisationRequest
+import net.corda.core.internal.NotarisationRequestSignature
 import net.corda.core.node.services.NotaryService
 import net.corda.core.node.services.TrustedAuthorityNotaryService
 import net.corda.core.node.services.UniquenessProvider
 import net.corda.core.serialization.CordaSerializable
+import net.corda.core.transactions.CoreTransaction
 import net.corda.core.transactions.SignedTransaction
 import net.corda.core.utilities.ProgressTracker
 import net.corda.core.utilities.UntrustworthyData
@@ -77,8 +82,6 @@ class NotaryFlow {
         protected fun notarise(notaryParty: Party): UntrustworthyData<List<TransactionSignature>> {
             return try {
                 val session = initiateFlow(notaryParty)
-                val notarisationRequestSignature = NotarisationRequest(stx.inputs, stx.id).generateSignature(serviceHub)
-                session.send(notarisationRequestSignature)
                 if (serviceHub.networkMapCache.isValidatingNotary(notaryParty)) {
                     sendAndReceiveValidating(session)
                 } else {
@@ -100,12 +103,13 @@ class NotaryFlow {
 
         @Suspendable
         protected open fun sendAndReceiveNonValidating(notaryParty: Party, session: FlowSession): UntrustworthyData<List<TransactionSignature>> {
-            val tx: Any = if (stx.isNotaryChangeTransaction()) {
+            val tx: CoreTransaction = if (stx.isNotaryChangeTransaction()) {
                 stx.notaryChangeTx // Notary change transactions do not support filtering
             } else {
                 stx.buildFilteredTransaction(Predicate { it is StateRef || it is TimeWindow || it == notaryParty })
             }
-            return session.sendAndReceiveWithRetry(tx)
+            val requestSignature = NotarisationRequest(stx.inputs, stx.id).generateSignature(serviceHub)
+            return session.sendAndReceiveWithRetry(NotarisationPayload(tx, requestSignature))
         }
 
         protected fun validateResponse(response: UntrustworthyData<List<TransactionSignature>>, notaryParty: Party): List<TransactionSignature> {
@@ -123,7 +127,7 @@ class NotaryFlow {
 
     /**
      * The [SendTransactionWithRetry] flow is equivalent to [SendTransactionFlow] but using [sendAndReceiveWithRetry]
-     * instead of [sendAndReceive], [SendTransactionWithRetry] is intended to be use by the notary client only.
+     * instead of [sendAndReceive], [SendTransactionWithRetry] is intended to be used by the notary client only.
      */
     private class SendTransactionWithRetry(otherSideSession: FlowSession, stx: SignedTransaction) : SendTransactionFlow(otherSideSession, stx) {
         @Suspendable
