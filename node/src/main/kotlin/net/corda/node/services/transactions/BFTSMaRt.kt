@@ -17,6 +17,7 @@ import net.corda.core.crypto.*
 import net.corda.core.flows.NotaryError
 import net.corda.core.flows.NotaryException
 import net.corda.core.identity.Party
+import net.corda.core.internal.NotarisationPayload
 import net.corda.core.internal.declaredField
 import net.corda.core.internal.toTypedArray
 import net.corda.core.node.services.UniquenessProvider
@@ -53,7 +54,7 @@ import java.util.*
 object BFTSMaRt {
     /** Sent from [Client] to [Replica]. */
     @CordaSerializable
-    data class CommitRequest(val tx: Any, val callerIdentity: Party)
+    data class CommitRequest(val payload: NotarisationPayload, val callerIdentity: Party)
 
     /** Sent from [Replica] to [Client]. */
     @CordaSerializable
@@ -102,11 +103,10 @@ object BFTSMaRt {
          * Sends a transaction commit request to the BFT cluster. The [proxy] will deliver the request to every
          * replica, and block until a sufficient number of replies are received.
          */
-        fun commitTransaction(transaction: Any, otherSide: Party): ClusterResponse {
-            require(transaction is CoreTransaction || transaction is SignedTransaction) { "Unsupported transaction type: ${transaction.javaClass.name}" }
+        fun commitTransaction(payload: NotarisationPayload, otherSide: Party): ClusterResponse {
             awaitClientConnectionToCluster()
             cluster.waitUntilAllReplicasHaveInitialized()
-            val requestBytes = CommitRequest(transaction, otherSide).serialize().bytes
+            val requestBytes = CommitRequest(payload, otherSide).serialize().bytes
             val responseBytes = proxy.invokeOrdered(requestBytes)
             return responseBytes.deserialize()
         }
@@ -247,8 +247,9 @@ object BFTSMaRt {
             return services.database.transaction { services.keyManagementService.sign(bytes, notaryIdentityKey) }
         }
 
-        protected fun sign(filteredTransaction: FilteredTransaction): TransactionSignature {
-            return services.database.transaction { services.createSignature(filteredTransaction, notaryIdentityKey) }
+        protected fun sign(txId: SecureHash): TransactionSignature {
+            val signableData = SignableData(txId, SignatureMetadata(services.myInfo.platformVersion, Crypto.findSignatureScheme(notaryIdentityKey).schemeNumberID))
+            return services.keyManagementService.sign(signableData, notaryIdentityKey)
         }
 
         // TODO:
