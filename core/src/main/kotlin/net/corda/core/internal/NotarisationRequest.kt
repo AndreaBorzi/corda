@@ -3,6 +3,8 @@ package net.corda.core.internal
 import net.corda.core.contracts.StateRef
 import net.corda.core.crypto.DigitalSignature
 import net.corda.core.crypto.SecureHash
+import net.corda.core.flows.NotaryError
+import net.corda.core.flows.NotaryException
 import net.corda.core.flows.NotaryFlow
 import net.corda.core.identity.Party
 import net.corda.core.node.ServiceHub
@@ -30,6 +32,11 @@ data class NotarisationRequest(val inputStates: List<StateRef>, val transactionI
     companion object {
         // Sorts in ascending order first by transaction hash, then by output index.
         private val stateRefComparator = compareBy<StateRef>({ it.txhash }, { it.index })
+
+        fun generateBytesToSign(inputStates: List<StateRef>, txId: SecureHash): ByteArray {
+            val sortedInputs = inputStates.sortedWith(stateRefComparator)
+            return NotarisationRequest(sortedInputs, txId).serialize().bytes
+        }
     }
 
     fun generateSignature(serviceHub: ServiceHub): NotarisationRequestSignature {
@@ -41,16 +48,17 @@ data class NotarisationRequest(val inputStates: List<StateRef>, val transactionI
         return NotarisationRequestSignature(signature)
     }
 
+    @Throws(NotaryException::class)
     fun verifySignature(requestSignature: NotarisationRequestSignature, intendedSigner: Party) {
-        val signature = requestSignature.digitalSignature
-        require(intendedSigner.owningKey == signature.by) { "Notarisation request for $transactionId not signed by the requesting party" }
-        val expectedSignedBytes = generateBytesToSign(inputStates, transactionId)
-        signature.verify(expectedSignedBytes)
-    }
-
-    private fun generateBytesToSign(inputStates: List<StateRef>, txId: SecureHash): ByteArray {
-        val sortedInputs = inputStates.sortedWith(stateRefComparator)
-        return NotarisationRequest(sortedInputs, txId).serialize().bytes
+        try {
+            val signature = requestSignature.digitalSignature
+            require(intendedSigner.owningKey == signature.by) { "Notarisation request for $transactionId not signed by the requesting party" }
+            val expectedSignedBytes = generateBytesToSign(inputStates, transactionId)
+            signature.verify(expectedSignedBytes)
+        } catch (e: Exception) {
+            val error = NotaryError.RequestSignatureInvalid(e)
+            throw NotaryException(error)
+        }
     }
 }
 
@@ -60,7 +68,7 @@ data class NotarisationRequestSignature(val digitalSignature: DigitalSignature.W
 
 /** Container for the transaction and notarisation request signature that are sent by a client to a notary service. */
 @CordaSerializable
-data class NotarisationPayload(private val transaction: Any, val requestSignature: NotarisationRequestSignature) {
+data class NotarisationPayload(val transaction: Any, val requestSignature: NotarisationRequestSignature) {
     init {
         require(transaction is SignedTransaction || transaction is CoreTransaction)
     }

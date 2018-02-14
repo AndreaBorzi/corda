@@ -13,6 +13,7 @@ import net.corda.core.utilities.contextLogger
 import org.slf4j.Logger
 import java.security.PublicKey
 import java.time.Clock
+import javax.naming.ServiceUnavailableException
 
 abstract class NotaryService : SingletonSerializeAsToken() {
     companion object {
@@ -94,7 +95,7 @@ abstract class TrustedAuthorityNotaryService : NotaryService() {
             }
         } catch (e: Exception) {
             log.error("Internal error", e)
-            throw NotaryException(NotaryError.General("Service unavailable, please try again later"))
+            throw NotaryException(NotaryError.General(ServiceUnavailableException("Service unavailable, please try again later")))
         }
     }
 

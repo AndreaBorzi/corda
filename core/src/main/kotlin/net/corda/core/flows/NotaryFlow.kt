@@ -205,7 +205,8 @@ sealed class NotaryError {
         override fun toString() = "Current time $currentTime is outside the time bounds specified by the transaction: $txTimeWindow"
 
         companion object {
-            @JvmField @Deprecated("Here only for binary compatibility purposes, do not use.")
+            @JvmField
+            @Deprecated("Here only for binary compatibility purposes, do not use.")
             val INSTANCE = TimeWindowInvalid(Instant.EPOCH, TimeWindow.fromOnly(Instant.EPOCH))
         }
     }
@@ -216,7 +217,11 @@ sealed class NotaryError {
 
     object WrongNotary : NotaryError()
 
-    data class General(val cause: String): NotaryError() {
-        override fun toString() = cause
+    data class General(val cause: Throwable) : NotaryError() {
+        override fun toString() = cause.toString()
+    }
+
+    data class RequestSignatureInvalid(val cause: Throwable) : NotaryError() {
+        override fun toString() = "Request signature invalid: " + cause.toString()
     }
 }
