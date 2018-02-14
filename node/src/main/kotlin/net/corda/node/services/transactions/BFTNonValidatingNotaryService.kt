@@ -80,10 +80,11 @@ class BFTNonValidatingNotaryService(
     private class ServiceFlow(val otherSideSession: FlowSession, val service: BFTNonValidatingNotaryService) : FlowLogic<Void?>() {
         @Suspendable
         override fun call(): Void? {
-            val tx = otherSideSession.receive<NotarisationPayload>().unwrap { (transaction, requestSignature) ->
+            val tx = otherSideSession.receive<NotarisationPayload>().unwrap { payload ->
+                val transaction = payload.coreTransaction
                 val request = NotarisationRequest(transaction.inputs, transaction.id)
                 val requestingParty = otherSideSession.counterparty
-                request.verifySignature(requestSignature, requestingParty)
+                request.verifySignature(payload.requestSignature, requestingParty)
                 // TODO: persist the signature for traceability.
                 transaction
             }
