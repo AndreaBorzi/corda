@@ -263,6 +263,11 @@ abstract class AbstractNetworkMapService(services: ServiceHubInternal,
         // Update the current value atomically, so that if multiple updates come
         // in on different threads, there is no risk of a race condition while checking
         // sequence numbers.
+        val entryWithSameAddress = nodeRegistrations.entries.find { it.key != identity && it.value.reg.node.addresses.any { it in node.addresses } }
+        if (entryWithSameAddress != null) {
+            logger.warn("Registration from $node contains address of existing node $entryWithSameAddress")
+            return RegistrationResponse("Address already taken!")
+        }
         val registrationInfo = try {
             nodeRegistrations.compute(identity) { _, existing: NodeRegistrationInfo? ->
                 require(!((existing == null || existing.reg.type == REMOVE) && change.type == REMOVE)) {
